@@ -85,6 +85,11 @@ const studentLogParamSchema = z.object({
   logId: objectId
 });
 
+const studentNoteParamSchema = z.object({
+  studentId: objectId,
+  noteId: objectId
+});
+
 const listUsersQuerySchema = z.object({
   role: z.enum(["student", "parent", "admin"]).optional()
 });
@@ -124,6 +129,7 @@ module.exports = {
   createNoteSchema,
   studentIdParamSchema,
   studentLogParamSchema,
+  studentNoteParamSchema,
   listUsersQuerySchema,
   userIdParamSchema,
   updateUserSchema,

@@ -34,4 +34,41 @@ const createNote = async (req, res) => {
   return res.status(201).json({ note });
 };
 
-module.exports = { listNotes, createNote };
+const updateNote = async (req, res) => {
+  const { studentId, noteId } = req.params;
+  const { title, contentOrLink } = req.body;
+
+  const note = await ParentNote.findOne({ _id: noteId, student: studentId });
+  if (!note) {
+    return res.status(404).json({ message: "Note not found" });
+  }
+
+  if (req.user.role === "parent" && String(note.parent) !== String(req.user.id)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  note.title = title || "";
+  note.contentOrLink = contentOrLink || "";
+  await note.save();
+  await note.populate("parent", "name email");
+
+  return res.status(200).json({ note });
+};
+
+const deleteNote = async (req, res) => {
+  const { studentId, noteId } = req.params;
+
+  const note = await ParentNote.findOne({ _id: noteId, student: studentId });
+  if (!note) {
+    return res.status(404).json({ message: "Note not found" });
+  }
+
+  if (req.user.role === "parent" && String(note.parent) !== String(req.user.id)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  await note.deleteOne();
+  return res.status(200).json({ noteId });
+};
+
+module.exports = { listNotes, createNote, updateNote, deleteNote };

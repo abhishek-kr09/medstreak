@@ -5,9 +5,10 @@ const { canAccessStudent } = require("../middleware/permissions");
 const { validate } = require("../middleware/validate");
 const {
   createNoteSchema,
-  studentIdParamSchema
+  studentIdParamSchema,
+  studentNoteParamSchema
 } = require("../validation/schemas");
-const { listNotes, createNote } = require("../controllers/noteController");
+const { listNotes, createNote, updateNote, deleteNote } = require("../controllers/noteController");
 
 const router = express.Router();
 
@@ -27,6 +28,25 @@ router.post(
   validate(createNoteSchema),
   canAccessStudent,
   createNote
+);
+
+router.put(
+  "/students/:studentId/notes/:noteId",
+  requireAuth,
+  allowRoles("parent", "admin"),
+  validate(studentNoteParamSchema, "params"),
+  validate(createNoteSchema),
+  canAccessStudent,
+  updateNote
+);
+
+router.delete(
+  "/students/:studentId/notes/:noteId",
+  requireAuth,
+  allowRoles("parent", "admin"),
+  validate(studentNoteParamSchema, "params"),
+  canAccessStudent,
+  deleteNote
 );
 
 module.exports = router;

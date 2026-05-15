@@ -20,6 +20,10 @@ const handleResponse = async (response) => {
         throw new Error(`${field}: ${messages[0]}`);
       }
     }
+    const formErrors = data?.errors?.formErrors || [];
+    if (formErrors.length > 0) {
+      throw new Error(formErrors[0]);
+    }
     throw new Error(message);
   }
   return data;
@@ -122,6 +126,27 @@ export const api = {
         method: "POST",
         headers: buildHeaders(token),
         body: JSON.stringify(payload)
+      }
+    );
+    return handleResponse(response);
+  },
+  updateNote: async ({ studentId, noteId, token, payload }) => {
+    const response = await fetch(
+      `${API_BASE}/api/students/${studentId}/notes/${noteId}`,
+      {
+        method: "PUT",
+        headers: buildHeaders(token),
+        body: JSON.stringify(payload)
+      }
+    );
+    return handleResponse(response);
+  },
+  deleteNote: async ({ studentId, noteId, token }) => {
+    const response = await fetch(
+      `${API_BASE}/api/students/${studentId}/notes/${noteId}`,
+      {
+        method: "DELETE",
+        headers: buildHeaders(token)
       }
     );
     return handleResponse(response);
