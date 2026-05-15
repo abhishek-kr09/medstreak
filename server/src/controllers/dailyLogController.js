@@ -1,0 +1,167 @@
+const mongoose = require("mongoose");
+const DailyLog = require("../models/DailyLog");
+const { normalizeDate, isFutureDate, isToday } = require("../utils/date");
+
+const listLogs = async (req, res) => {
+  const { studentId } = req.params;
+  const { start, end } = req.query;
+
+  const query = { student: studentId };
+  if (start || end) {
+    query.date = {};
+    if (start) {
+      const startDate = normalizeDate(start);
+      if (!startDate) {
+        return res.status(400).json({ message: "Invalid start date" });
+      }
+      query.date.$gte = startDate;
+    }
+    if (end) {
+      const endDate = normalizeDate(end);
+      if (!endDate) {
+        return res.status(400).json({ message: "Invalid end date" });
+      }
+      query.date.$lte = endDate;
+    }
+  }
+
+  const logs = await DailyLog.find(query).sort({ date: 1 });
+  return res.status(200).json({ logs });
+};
+
+const createLog = async (req, res) => {
+  const { studentId } = req.params;
+  const {
+    date,
+    activityDescription,
+    physicsQuestions,
+    chemistryQuestions,
+    biologyQuestions
+  } = req.body;
+
+  const normalizedDate = normalizeDate(date);
+  if (!normalizedDate) {
+    return res.status(400).json({ message: "Invalid date" });
+  }
+
+  if (isFutureDate(normalizedDate)) {
+    return res.status(400).json({ message: "Future dates are not allowed" });
+  }
+
+  if (req.user?.role === "student" && !isToday(normalizedDate)) {
+    return res.status(403).json({ message: "Students can only edit today" });
+  }
+
+  try {
+    const log = await DailyLog.create({
+      student: studentId,
+      date: normalizedDate,
+      activityDescription,
+      physicsQuestions,
+      chemistryQuestions,
+      biologyQuestions
+    });
+    return res.status(201).json({ log });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "Log already exists for date" });
+    }
+    return res.status(500).json({ message: "Failed to create log" });
+  }
+};
+
+const updateLog = async (req, res) => {
+  const { studentId, logId } = req.params;
+  const updates = { ...req.body };
+
+  if (req.user?.role === "student") {
+    const existing = await DailyLog.findOne({ _id: logId, student: studentId });
+    if (!existing) {
+      return res.status(404).json({ message: "Log not found" });
+    }
+    if (!isToday(normalizeDate(existing.date))) {
+      return res.status(403).json({ message: "Students can only edit today" });
+    }
+  }
+
+  if (updates.date) {
+    const normalizedDate = normalizeDate(updates.date);
+    if (!normalizedDate) {
+      return res.status(400).json({ message: "Invalid date" });
+    }
+    if (isFutureDate(normalizedDate)) {
+      return res.status(400).json({ message: "Future dates are not allowed" });
+    }
+    if (req.user?.role === "student" && !isToday(normalizedDate)) {
+      return res.status(403).json({ message: "Students can only edit today" });
+    }
+    updates.date = normalizedDate;
+  }
+
+  const log = await DailyLog.findOneAndUpdate(
+    { _id: logId, student: studentId },
+    updates,
+    { new: true, runValidators: true }
+  );
+
+  if (!log) {
+    return res.status(404).json({ message: "Log not found" });
+  }
+
+  return res.status(200).json({ log });
+};
+
+const deleteLog = async (req, res) => {
+  const { studentId, logId } = req.params;
+  const existing = await DailyLog.findOne({ _id: logId, student: studentId });
+  if (!existing) {
+    return res.status(404).json({ message: "Log not found" });
+  }
+
+  if (req.user?.role === "student" && !isToday(normalizeDate(existing.date))) {
+    return res.status(403).json({ message: "Students can only edit today" });
+  }
+
+  const log = await DailyLog.findOneAndDelete({ _id: logId, student: studentId });
+
+  if (!log) {
+    return res.status(404).json({ message: "Log not found" });
+  }
+
+  return res.status(200).json({ message: "Log deleted" });
+};
+
+const getSummary = async (req, res) => {
+  const { studentId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    return res.status(400).json({ message: "Invalid student id" });
+  }
+
+  const summary = await DailyLog.aggregate([
+    { $match: { student: mongoose.Types.ObjectId.createFromHexString(studentId) } },
+    {
+      $group: {
+        _id: "$student",
+        physicsQuestions: { $sum: "$physicsQuestions" },
+        chemistryQuestions: { $sum: "$chemistryQuestions" },
+        biologyQuestions: { $sum: "$biologyQuestions" }
+      }
+    }
+  ]);
+
+  return res.status(200).json({
+    summary: summary[0] || {
+      physicsQuestions: 0,
+      chemistryQuestions: 0,
+      biologyQuestions: 0
+    }
+  });
+};
+
+module.exports = {
+  listLogs,
+  createLog,
+  updateLog,
+  deleteLog,
+  getSummary
+};
