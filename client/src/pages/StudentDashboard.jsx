@@ -17,6 +17,7 @@ const emptyRow = {
 const StudentDashboard = () => {
   const { user, token, updateUser } = useAuth();
   const [logs, setLogs] = useState({});
+  const [trends, setTrends] = useState({});
   const [summary, setSummary] = useState(null);
   const [savingDate, setSavingDate] = useState(null);
   const [error, setError] = useState("");
@@ -51,15 +52,16 @@ const StudentDashboard = () => {
 
   const chartDates = useMemo(() => {
     if (!user?.targetExamDate) return [];
-    const start = today;
-    const end = new Date(user.targetExamDate);
+    const startSource = user.targetSetAt || user.createdAt || today;
+    const start = new Date(startSource);
+    const end = new Date(today);
     if (end < start) return createDateRange(end, end);
     return createDateRange(start, end);
   }, [user, today]);
 
   const previousDates = useMemo(() => {
     if (!user?.targetExamDate) return [];
-    const start = user.createdAt ? new Date(user.createdAt) : today;
+    const start = user.targetSetAt ? new Date(user.targetSetAt) : today;
     const end = new Date(today);
     end.setDate(end.getDate() - 1);
     if (end < start) return [];
@@ -77,9 +79,15 @@ const StudentDashboard = () => {
 
     const fetchData = async () => {
       try {
-        const [logsResponse, summaryResponse] = await Promise.all([
-          api.getLogs({ studentId, token, end: toInputDate(today) }),
-          api.getSummary({ studentId, token })
+        const startDate = chartDates[0] ? toInputDate(chartDates[0]) : undefined;
+        const endDate = toInputDate(today);
+        const startLogsDate = new Date(today);
+        startLogsDate.setDate(startLogsDate.getDate() - 29);
+        const startLogs = toInputDate(startLogsDate);
+        const [logsResponse, summaryResponse, trendsResponse] = await Promise.all([
+          api.getLogs({ studentId, token, start: startLogs, end: endDate }),
+          api.getSummary({ studentId, token }),
+          api.getTrends({ studentId, token, start: startDate, end: endDate })
         ]);
 
         const mappedLogs = (logsResponse.logs || []).reduce((acc, log) => {
@@ -88,8 +96,14 @@ const StudentDashboard = () => {
           return acc;
         }, {});
 
+        const mappedTrends = (trendsResponse.trends || []).reduce((acc, item) => {
+          acc[item.date] = item;
+          return acc;
+        }, {});
+
         setLogs(mappedLogs);
         setSummary(summaryResponse.summary);
+        setTrends(mappedTrends);
         setIsEditingToday(!mappedLogs[todayKey]?._id);
         setError("");
       } catch (err) {
@@ -98,7 +112,7 @@ const StudentDashboard = () => {
     };
 
     fetchData();
-  }, [studentId, token, user?.targetExamDate, today]);
+  }, [studentId, token, user?.targetExamDate, today, chartDates.length]);
 
 
   const handleChange = (dateKey, field, value) => {
@@ -178,7 +192,7 @@ const StudentDashboard = () => {
 
   const chartData = chartDates.map((date) => {
     const key = toDateKey(date);
-    const row = logs[key] || emptyRow;
+    const row = trends[key] || emptyRow;
     const physics = Number(row.physicsQuestions || 0);
     const chemistry = Number(row.chemistryQuestions || 0);
     const biology = Number(row.biologyQuestions || 0);
@@ -240,6 +254,9 @@ const StudentDashboard = () => {
             </div>
             <p className="text-xs text-slate-500">
               Deleting the target clears all logs for this journey.
+            </p>
+            <p className="text-xs text-slate-500">
+              Target set: {toInputDate(user.targetSetAt) || "-"}
             </p>
           </CardContent>
         </Card>
@@ -392,7 +409,7 @@ const StudentDashboard = () => {
                     </CardContent>
                   </Card>
                 ) : (
-                  previousDates.map((date) => {
+                  [...previousDates].reverse().map((date) => {
                     const dateKey = toDateKey(date);
                     const log = logs[dateKey];
                     return (

@@ -98,6 +98,16 @@ export const api = {
     );
     return handleResponse(response);
   },
+  getTrends: async ({ studentId, token, start, end }) => {
+    const params = new URLSearchParams();
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    const response = await fetch(
+      `${API_BASE}/api/students/${studentId}/logs/trends?${params.toString()}`,
+      { headers: buildHeaders(token) }
+    );
+    return handleResponse(response);
+  },
   getNotes: async ({ studentId, token }) => {
     const response = await fetch(
       `${API_BASE}/api/students/${studentId}/notes`,

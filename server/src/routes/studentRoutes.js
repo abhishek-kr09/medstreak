@@ -8,10 +8,13 @@ const {
   createLog,
   updateLog,
   deleteLog,
-  getSummary
+  getSummary,
+  getConsistency,
+  getTrends
 } = require("../controllers/dailyLogController");
 const {
   listLogsQuerySchema,
+  trendLogsQuerySchema,
   createLogSchema,
   updateLogSchema,
   studentIdParamSchema,
@@ -48,12 +51,14 @@ router.patch(
 
     if (!targetExamDate) {
       student.targetExamDate = null;
+      student.targetSetAt = null;
       await student.save();
       await DailyLog.deleteMany({ student: student._id });
       return res.status(200).json({ user: student.toJSON(), logsCleared: true });
     }
 
     student.targetExamDate = targetExamDate;
+    student.targetSetAt = new Date();
     await student.save();
     return res.status(200).json({ user: student.toJSON(), logsCleared: false });
   }
@@ -74,6 +79,24 @@ router.get(
   validate(studentIdParamSchema, "params"),
   canAccessStudent,
   getSummary
+);
+
+router.get(
+  "/:studentId/logs/consistency",
+  requireAuth,
+  validate(studentIdParamSchema, "params"),
+  validate(trendLogsQuerySchema, "query"),
+  canAccessStudent,
+  getConsistency
+);
+
+router.get(
+  "/:studentId/logs/trends",
+  requireAuth,
+  validate(studentIdParamSchema, "params"),
+  validate(trendLogsQuerySchema, "query"),
+  canAccessStudent,
+  getTrends
 );
 
 router.post(

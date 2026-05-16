@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["student", "parent", "admin"], required: true },
     targetExamDate: { type: Date },
+    targetSetAt: { type: Date },
     uniqueConnectCode: { type: String, unique: true, sparse: true },
     parentsLinked: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     studentsLinked: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]

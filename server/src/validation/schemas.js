@@ -51,6 +51,11 @@ const listLogsQuerySchema = z.object({
   end: dateString.optional()
 });
 
+const trendLogsQuerySchema = z.object({
+  start: dateString.optional(),
+  end: dateString.optional()
+});
+
 const createLogSchema = z.object({
   date: dateString,
   activityDescription: z.string().trim().max(2000).optional(),
@@ -76,6 +81,10 @@ const createNoteSchema = z
     message: "Title or content is required"
   });
 
+const createAttachmentSchema = z.object({
+  title: z.string().trim().max(200).optional()
+});
+
 const studentIdParamSchema = z.object({
   studentId: objectId
 });
@@ -88,6 +97,11 @@ const studentLogParamSchema = z.object({
 const studentNoteParamSchema = z.object({
   studentId: objectId,
   noteId: objectId
+});
+
+const studentAttachmentParamSchema = z.object({
+  studentId: objectId,
+  attachmentId: objectId
 });
 
 const listUsersQuerySchema = z.object({
@@ -124,12 +138,15 @@ module.exports = {
   registerAdminSchema,
   loginSchema,
   listLogsQuerySchema,
+  trendLogsQuerySchema,
   createLogSchema,
   updateLogSchema,
   createNoteSchema,
+  createAttachmentSchema,
   studentIdParamSchema,
   studentLogParamSchema,
   studentNoteParamSchema,
+  studentAttachmentParamSchema,
   listUsersQuerySchema,
   userIdParamSchema,
   updateUserSchema,

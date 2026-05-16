@@ -18,7 +18,7 @@ const ParentDashboard = () => {
   const [students, setStudents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [logs, setLogs] = useState({});
+  const [trends, setTrends] = useState({});
   const [message, setMessage] = useState({ title: "", contentOrLink: "" });
   const [error, setError] = useState("");
   const [editingNoteId, setEditingNoteId] = useState(null);
@@ -65,19 +65,18 @@ const ParentDashboard = () => {
         const end = toInputDate(today);
         const start = new Date(today);
         start.setDate(start.getDate() - 6);
-        const [notesResponse, summaryResponse, logsResponse] = await Promise.all([
+        const [notesResponse, summaryResponse, trendsResponse] = await Promise.all([
           api.getNotes({ studentId: selectedStudentId, token }),
           api.getSummary({ studentId: selectedStudentId, token }),
-          api.getLogs({ studentId: selectedStudentId, token, start: toInputDate(start), end })
+          api.getTrends({ studentId: selectedStudentId, token, start: toInputDate(start), end })
         ]);
-        const mappedLogs = (logsResponse.logs || []).reduce((acc, log) => {
-          const key = toDateKey(log.date);
-          acc[key] = log;
+        const mappedTrends = (trendsResponse.trends || []).reduce((acc, item) => {
+          acc[item.date] = item;
           return acc;
         }, {});
         setNotes(notesResponse.notes || []);
         setSummary(summaryResponse.summary);
-        setLogs(mappedLogs);
+        setTrends(mappedTrends);
         setError("");
       } catch (err) {
         setError(err.message || "Unable to load student data");
@@ -191,7 +190,7 @@ const ParentDashboard = () => {
 
   const chartData = chartDates.map((date) => {
     const key = toDateKey(date);
-    const row = logs[key] || emptyRow;
+    const row = trends[key] || emptyRow;
     const physics = Number(row.physicsQuestions || 0);
     const chemistry = Number(row.chemistryQuestions || 0);
     const biology = Number(row.biologyQuestions || 0);

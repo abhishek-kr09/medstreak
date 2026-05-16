@@ -50,6 +50,7 @@ const updateUser = async (req, res) => {
 
   if (updates.targetExamDate) {
     updates.targetExamDate = new Date(updates.targetExamDate);
+    updates.targetSetAt = new Date();
   }
 
   Object.assign(user, updates);

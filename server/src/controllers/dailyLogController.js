@@ -158,10 +158,177 @@ const getSummary = async (req, res) => {
   });
 };
 
+const getConsistency = async (req, res) => {
+  const { studentId } = req.params;
+  const { start, end } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    return res.status(400).json({ message: "Invalid student id" });
+  }
+
+  const match = { student: mongoose.Types.ObjectId.createFromHexString(studentId) };
+
+  if (start || end) {
+    match.date = {};
+    if (start) {
+      const startDate = normalizeDate(start);
+      if (!startDate) {
+        return res.status(400).json({ message: "Invalid start date" });
+      }
+      match.date.$gte = startDate;
+    }
+    if (end) {
+      const endDate = normalizeDate(end);
+      if (!endDate) {
+        return res.status(400).json({ message: "Invalid end date" });
+      }
+      match.date.$lte = endDate;
+    }
+  }
+
+  const timeZone = process.env.APP_TIMEZONE || "Asia/Kolkata";
+
+  const days = await DailyLog.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: {
+          date: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$date",
+              timezone: timeZone
+            }
+          }
+        },
+        physicsQuestions: { $sum: "$physicsQuestions" },
+        chemistryQuestions: { $sum: "$chemistryQuestions" },
+        biologyQuestions: { $sum: "$biologyQuestions" }
+      }
+    },
+    { $sort: { "_id.date": 1 } }
+  ]);
+
+  const series = days.map((item) => ({
+    date: item._id.date,
+    physicsQuestions: item.physicsQuestions,
+    chemistryQuestions: item.chemistryQuestions,
+    biologyQuestions: item.biologyQuestions
+  }));
+
+  const toDate = (value) => new Date(`${value}T00:00:00`);
+  const computeStreak = (rows, field) => {
+    let current = 0;
+    let lastDate = null;
+
+    for (const row of rows) {
+      const hasValue = Number(row[field] || 0) > 0;
+      if (!hasValue) {
+        current = 0;
+        lastDate = null;
+        continue;
+      }
+
+      const nextDate = toDate(row.date);
+      if (lastDate) {
+        const diff = (nextDate.getTime() - lastDate.getTime()) / 86400000;
+        current = diff === 1 ? current + 1 : 1;
+      } else {
+        current = 1;
+      }
+
+      lastDate = nextDate;
+    }
+
+    return current;
+  };
+
+  const totals = {
+    physicsActiveDays: series.filter((row) => row.physicsQuestions > 0).length,
+    chemistryActiveDays: series.filter((row) => row.chemistryQuestions > 0).length,
+    biologyActiveDays: series.filter((row) => row.biologyQuestions > 0).length,
+    totalDays: series.length,
+    physicsCurrentStreak: computeStreak(series, "physicsQuestions"),
+    chemistryCurrentStreak: computeStreak(series, "chemistryQuestions"),
+    biologyCurrentStreak: computeStreak(series, "biologyQuestions")
+  };
+
+  return res.status(200).json({ series, totals });
+};
+
+const getTrends = async (req, res) => {
+  const { studentId } = req.params;
+  const { start, end } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(studentId)) {
+    return res.status(400).json({ message: "Invalid student id" });
+  }
+
+  const match = { student: mongoose.Types.ObjectId.createFromHexString(studentId) };
+
+  if (start || end) {
+    match.date = {};
+    if (start) {
+      const startDate = normalizeDate(start);
+      if (!startDate) {
+        return res.status(400).json({ message: "Invalid start date" });
+      }
+      match.date.$gte = startDate;
+    }
+    if (end) {
+      const endDate = normalizeDate(end);
+      if (!endDate) {
+        return res.status(400).json({ message: "Invalid end date" });
+      }
+      match.date.$lte = endDate;
+    }
+  }
+
+  const timeZone = process.env.APP_TIMEZONE || "Asia/Kolkata";
+
+  const trends = await DailyLog.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: {
+          date: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$date",
+              timezone: timeZone
+            }
+          }
+        },
+        physicsQuestions: { $sum: "$physicsQuestions" },
+        chemistryQuestions: { $sum: "$chemistryQuestions" },
+        biologyQuestions: { $sum: "$biologyQuestions" },
+        totalQuestions: {
+          $sum: {
+            $add: ["$physicsQuestions", "$chemistryQuestions", "$biologyQuestions"]
+          }
+        }
+      }
+    },
+    { $sort: { "_id.date": 1 } }
+  ]);
+
+  return res.status(200).json({
+    trends: trends.map((item) => ({
+      date: item._id.date,
+      physicsQuestions: item.physicsQuestions,
+      chemistryQuestions: item.chemistryQuestions,
+      biologyQuestions: item.biologyQuestions,
+      totalQuestions: item.totalQuestions
+    }))
+  });
+};
+
 module.exports = {
   listLogs,
   createLog,
   updateLog,
   deleteLog,
-  getSummary
+  getSummary,
+  getConsistency,
+  getTrends
 };
